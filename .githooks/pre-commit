@@ -1,0 +1,45 @@
+#!/bin/sh
+# Pre-commit hook: blocks forbidden folders and large non-LFS files
+
+# Запрещённые папки (в начале пути)
+FORBIDDEN_DIRS="Saved Intermediate Binaries DerivedDataCache .vs"
+
+# Максимальный размер файла в байтах (50 MB)
+MAX_SIZE=$((50 * 1024 * 1024))
+
+# Получить список файлов в индексе
+FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ -z "$FILES" ]; then
+  exit 0
+fi
+
+for FILE in $FILES; do
+  # Проверка на запрещённые папки
+  for DIR in $FORBIDDEN_DIRS; do
+    case "$FILE" in
+      "$DIR"/*)
+        echo "ERROR: commit blocked. File '$FILE' is in forbidden folder '$DIR/'." >&2
+        echo "These folders must be in .gitignore and never committed." >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  # Проверка размера
+  if [ -f "$FILE" ]; then
+    SIZE=$(wc -c < "$FILE" | tr -d ' ')
+    if [ "$SIZE" -gt "$MAX_SIZE" ]; then
+      # Проверить, что файл tracked через LFS
+      ATTR=$(git check-attr filter -- "$FILE" | awk -F': ' '{print $3}')
+      if [ "$ATTR" != "lfs" ]; then
+        echo "ERROR: commit blocked. File '$FILE' is $((SIZE / 1024 / 1024)) MB (>50 MB) and NOT tracked by Git LFS." >&2
+        echo "Add it to .gitattributes and re-add the file." >&2
+        exit 1
+      fi
+    fi
+  fi
+done
+
+echo "pre-commit checks passed."
+exit 0
