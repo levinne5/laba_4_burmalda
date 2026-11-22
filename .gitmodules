@@ -1,0 +1,3 @@
+[submodule "ContentSharedAssets"]
+	path = ContentSharedAssets
+	url = https://github.com/archl160/ContentSharedAssets.git
